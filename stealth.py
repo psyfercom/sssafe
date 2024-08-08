@@ -201,7 +201,7 @@ def run_main_app():
     # Ensure the secrets file exists
     def ensure_secrets_file():
         if not os.path.exists(SECRETS_FILE):
-            with open(SECRETS_FILE, 'w') as f):
+            with open(SECRETS_FILE, 'w') as f:
                 json.dump({}, f)
             console.print(Panel("Created new secrets file.", title="Info", style="bold green", border_style="green"))
 
@@ -267,7 +267,7 @@ def run_main_app():
         header = Text("Secret Manager CLI", justify="center", style="bold white on blue")
         header.append("\n[Version 1.0]", style="bold yellow")
         header.append("\n\nManage your secrets securely with encryption and time-based keys.", style="dim white")
-        console.print(Panel(header, title="Welcome", border_style="blue", padding=(1, 1))
+        console.print(Panel(header, title="Welcome", border_style="blue", padding=(1, 1)))
         console.print(Panel("""
 [bold cyan]1.[/] [bold white]Add Secret[/]
 [bold cyan]2.[/] [bold white]Edit Secret[/]
