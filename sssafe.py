@@ -8,7 +8,6 @@ from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 from rich.panel import Panel
-from rich.text import Text
 from rich import box
 import os
 import json
@@ -21,6 +20,8 @@ console = Console()
 SECRETS_FILE = "secrets.json"
 USER_FILE = "user.json"
 CONFIG_FILE = "config.json"
+RSA_PRIVATE_KEY_FILE = "rsa_private_key.pem"
+RSA_PUBLIC_KEY_FILE = "rsa_public_key.pem"
 
 # Load user data
 def load_user_data():
@@ -50,6 +51,47 @@ def save_config(data):
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+# Generate and store RSA keys
+def generate_and_store_rsa_keys():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+
+    # Serialize private key
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    # Serialize public key
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    # Save keys to files
+    with open(RSA_PRIVATE_KEY_FILE, 'wb') as f:
+        f.write(private_pem)
+    with open(RSA_PUBLIC_KEY_FILE, 'wb') as f:
+        f.write(public_pem)
+
+    return private_pem, public_pem
+
+# Load RSA private key
+def load_rsa_private_key():
+    with open(RSA_PRIVATE_KEY_FILE, 'rb') as f:
+        private_key = serialization.load_pem_private_key(f.read(), password=None)
+    return private_key
+
+# Load RSA public key
+def load_rsa_public_key():
+    with open(RSA_PUBLIC_KEY_FILE, 'rb') as f:
+        public_key = serialization.load_pem_public_key(f.read())
+    return public_key
+
 # Sign up a new user
 def sign_up():
     console.print(Panel("Sign Up", title="Sign Up", style="bold green", border_style="green"))
@@ -67,6 +109,10 @@ def sign_up():
     user_data[username] = {"password": password_hash}
     save_user_data(user_data)
     save_config(config)
+
+    # Generate and store RSA keys
+    generate_and_store_rsa_keys()
+
     console.print(Panel(f"Sign up successful! Your encryption key is: {encryption_key.decode('utf-8')}", title="Success", style="bold green", border_style="green"))
     return True
 
@@ -105,45 +151,27 @@ def run_main_app():
     config = load_config()
     ENCRYPTION_KEY = config['ENCRYPTION_KEY'].encode('utf-8')
 
-    # Generate RSA keys
-    def generate_rsa_keys():
-        private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-        )
-        public_key = private_key.public_key()
+    # Load RSA keys
+    if not os.path.exists(RSA_PRIVATE_KEY_FILE) or not os.path.exists(RSA_PUBLIC_KEY_FILE):
+        generate_and_store_rsa_keys()
 
-        # Serialize private key
-        private_pem = private_key.private_bytes(
-           encoding=serialization.Encoding.PEM,
-           format=serialization.PrivateFormat.PKCS8,
-           encryption_algorithm=serialization.NoEncryption()
-        )
-
-        # Serialize public key
-        public_pem = public_key.public_bytes(
-           encoding=serialization.Encoding.PEM,
-           format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
-        return private_pem, public_pem
-
-    RSA_PRIVATE_KEY, RSA_PUBLIC_KEY = generate_rsa_keys()
+    RSA_PRIVATE_KEY = load_rsa_private_key()
+    RSA_PUBLIC_KEY = load_rsa_public_key()
 
     # Encrypt data using all methods
     def encrypt_data(data):
-        fernet = Fernet(ENCRYPT_KEY)
+        fernet = Fernet(ENCRYPTION_KEY)
         encrypted_fernet = fernet.encrypt(data.encode())
         
         salt = os.urandom(16)
         kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1)
-        key = kdf.derive(ENCRYPT_KEY)
+        key = kdf.derive(ENCRYPTION_KEY)
         cipher = Cipher(algorithms.AES(key), modes.GCM(salt))
         encryptor = cipher.encryptor()
         encrypted_aes = encryptor.update(data.encode()) + encryptor.finalize()
         encrypted_aes = base64.urlsafe_b64encode(salt + encryptor.tag + encrypted_aes)
         
-        public_key = serialization.load_pem_public_key(RSA_PUBLIC_KEY)
-        encrypted_rsa = public_key.encrypt(
+        encrypted_rsa = RSA_PUBLIC_KEY.encrypt(
             data.encode(),
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -161,7 +189,7 @@ def run_main_app():
 
     # Decrypt data using all methods
     def decrypt_data(secret):
-        fernet = Fernet(ENCRYPT_KEY)
+        fernet = Fernet(ENCRYPTION_KEY)
         decrypted_fernet = fernet.decrypt(secret["fernet"].encode()).decode()
         
         encrypted_aes = base64.urlsafe_b64decode(secret["aes"])
@@ -169,13 +197,12 @@ def run_main_app():
         tag = encrypted_aes[16:32]
         ciphertext = encrypted_aes[32:]
         kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1)
-        key = kdf.derive(ENCRYPT_KEY)
+        key = kdf.derive(ENCRYPTION_KEY)
         cipher = Cipher(algorithms.AES(key), modes.GCM(salt, tag))
         decryptor = cipher.decryptor()
         decrypted_aes = (decryptor.update(ciphertext) + decryptor.finalize()).decode()
 
-        private_key = serialization.load_pem_private_key(RSA_PRIVATE_KEY, password=None)
-        decrypted_rsa = private_key.decrypt(
+        decrypted_rsa = RSA_PRIVATE_KEY.decrypt(
             base64.urlsafe_b64decode(secret["rsa"]),
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -292,3 +319,4 @@ def run_main_app():
 
 if __name__ == "__main__":
     main()
+
