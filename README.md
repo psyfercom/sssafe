@@ -10,69 +10,6 @@ Welcome to Sssafe, the hiss-terically secure command line secrets and password m
 	•	Easy Management: Add, edit, view, and delete secrets with ease.
 	•	Hiss-terical Fun: Because who said security can’t be fun?
 
-## Installation
-
-	1.	Clone the repository:
-
-git clone https://github.com/yourusername/sssafe.git
-
-
-	2.	Navigate to the project directory:
-
-cd sssafe
-
-
-	3.	Install the required dependencies:
-
-pip install -r requirements.txt
-
-
-
-## Usage
-
-	1.	Sign Up:
-
-python sssafe.py
-
-Follow the prompts to create a new user.
-
-	2.	Sign In:
-
-python sssafe.py
-
-Follow the prompts to sign in with your username and password.
-
-	3.	Manage Your Secrets:
-	•	Add a secret:
-
-add
-
-
-	•	Edit a secret:
-
-edit
-
-
-	•	View a secret:
-
-view
-
-
-	•	Delete a secret:
-
-delete
-
-
-	•	List all secrets:
-
-list
-
-
-	4.	Exit:
-
-exit
-
-
 
 ## Contributing
 
