@@ -131,12 +131,12 @@ def run_main_app():
 
     # Encrypt data using all methods
     def encrypt_data(data):
-        fernet = Fernet(ENCRYPTION_KEY)
+        fernet = Fernet(ENCRYPT_KEY)
         encrypted_fernet = fernet.encrypt(data.encode())
         
         salt = os.urandom(16)
         kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1)
-        key = kdf.derive(ENCRYPTION_KEY)
+        key = kdf.derive(ENCRYPT_KEY)
         cipher = Cipher(algorithms.AES(key), modes.GCM(salt))
         encryptor = cipher.encryptor()
         encrypted_aes = encryptor.update(data.encode()) + encryptor.finalize()
@@ -161,7 +161,7 @@ def run_main_app():
 
     # Decrypt data using all methods
     def decrypt_data(secret):
-        fernet = Fernet(ENCRYPTION_KEY)
+        fernet = Fernet(ENCRYPT_KEY)
         decrypted_fernet = fernet.decrypt(secret["fernet"].encode()).decode()
         
         encrypted_aes = base64.urlsafe_b64decode(secret["aes"])
@@ -169,7 +169,7 @@ def run_main_app():
         tag = encrypted_aes[16:32]
         ciphertext = encrypted_aes[32:]
         kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1)
-        key = kdf.derive(ENCRYPTION_KEY)
+        key = kdf.derive(ENCRYPT_KEY)
         cipher = Cipher(algorithms.AES(key), modes.GCM(salt, tag))
         decryptor = cipher.decryptor()
         decrypted_aes = (decryptor.update(ciphertext) + decryptor.finalize()).decode()
@@ -232,24 +232,17 @@ def run_main_app():
     def get_secret():
         secrets = load_secrets()
         name = Prompt.ask("[bold cyan]Enter secret name[/]")
-        secret = secrets.get(name)
-        if secret:
-            try:
-                decrypted_values = decrypt_data(secret)
-                console.print(Panel(f"[bold blue]Decrypted Values:\nFernet: {decrypted_values[0]}\nAES: {decrypted_values[1]}\nRSA: {decrypted_values[2]}", title="Secret Retrieved", style="bold blue", border_style="blue", padding=(1, 1)))
-            except Exception as e:
-                console.print(Panel(f"Error: {e}", title="Decryption Error", style="bold red", border_style="red", padding=(1, 1)))
+        if name in secrets:
+            decrypted_values = decrypt_data(secrets[name])
+            table = Table(title="Decrypted Secret", show_header=True, header_style="bold magenta")
+            table.add_column("Method", style="dim", width=12)
+            table.add_column("Decrypted Value")
+            table.add_row("Fernet", decrypted_values[0])
+            table.add_row("AES", decrypted_values[1])
+            table.add_row("RSA", decrypted_values[2])
+            console.print(table)
         else:
             console.print(Panel("Secret not found!", title="Error", style="bold red", border_style="red", padding=(1, 1)))
-
-    # List Secrets
-    def list_secrets():
-        secrets = load_secrets()
-        table = Table(title="Secrets", show_header=True, header_style="bold magenta", box=box.ROUNDED, padding=(1, 1))
-        table.add_column("Name", style="cyan", no_wrap=True)
-        for name in secrets:
-            table.add_row(name)
-        console.print(table)
 
     # Delete Secret
     def delete_secret():
@@ -262,39 +255,39 @@ def run_main_app():
         else:
             console.print(Panel("Secret not found!", title="Error", style="bold red", border_style="red", padding=(1, 1)))
 
-    # Display menu with ASCII art and borders
-    def display_menu():
-        header = Text("Secret Manager CLI", justify="center", style="bold white on blue")
-        header.append("\n[Version 1.0]", style="bold yellow")
-        header.append("\n\nManage your secrets securely with encryption and time-based keys.", style="dim white")
-        console.print(Panel(header, title="Welcome", border_style="blue", padding=(1, 1)))
-        console.print(Panel("""
-[bold cyan]1.[/] [bold white]Add Secret[/]
-[bold cyan]2.[/] [bold white]Edit Secret[/]
-[bold cyan]3.[/] [bold white]View Secret[/]
-[bold cyan]4.[/] [bold white]List All Secrets[/]
-[bold cyan]5.[/] [bold white]Delete Secret[/]
-[bold cyan]6.[/] [bold white]Exit[/]""", border_style="blue", padding=(1, 2)))
+    # List all secrets
+    def list_secrets():
+        secrets = load_secrets()
+        table = Table(title="Stored Secrets", show_header=True, header_style="bold magenta")
+        table.add_column("Name", style="dim", width=12)
+        table.add_column("Encrypted Value")
+        for name, secret in secrets.items():
+            table.add_row(name, secret["fernet"])
+        console.print(table)
 
-    # Ensure the secrets file exists
+    # Ensure secrets file exists on startup
     ensure_secrets_file()
 
     # Main loop
     while True:
-        display_menu()
-        choice = Prompt.ask("[bold cyan]Choose an option[/]", choices=["1", "2", "3", "4", "5", "6"], default="6")
-        if choice == "1":
+        choice = Prompt.ask(
+            "[bold cyan]What do you want to do?[/]",
+            choices=["add", "edit", "view", "delete", "list", "exit"],
+            default="exit"
+        )
+
+        if choice == "add":
             add_secret()
-        elif choice == "2":
+        elif choice == "edit":
             edit_secret()
-        elif choice == "3":
+        elif choice == "view":
             get_secret()
-        elif choice == "4":
-            list_secrets()
-        elif choice == "5":
+        elif choice == "delete":
             delete_secret()
-        elif choice == "6":
-            console.print(Panel("Exiting...", title="Goodbye", style="bold red", border_style="red", padding=(1, 1)))
+        elif choice == "list":
+            list_secrets()
+        elif choice == "exit":
+            console.print(Panel("Exiting...", title="Goodbye", style="bold red", border_style="red"))
             break
 
 if __name__ == "__main__":
