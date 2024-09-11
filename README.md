@@ -1,3 +1,4 @@
+![Safe with snake motif]([https://github.com/psyfercom/ssafe/blob/main/sssafe_snake(DALL-E).webp)
 # Sssafe: Hiss-terically Secure
 
 Welcome to Sssafe, the hiss-terically secure command line secrets and password manager written in Python. Sssafe helps you lock down your sensitive information with the gripping power of a python.
